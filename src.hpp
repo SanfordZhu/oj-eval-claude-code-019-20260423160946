@@ -10,6 +10,7 @@ void Calculate(std::vector<Matrix *> keys, std::vector<Matrix *> values,
     auto current_query = rater.GetNextQuery();
 
     // Step 1: Concatenate K and V matrices for the first i+1 elements
+    // K and V are initially 1x512 matrices, we need to stack them vertically
     Matrix* concat_k = matrix_memory_allocator.Allocate("concat_k_" + std::to_string(i));
     Matrix* concat_v = matrix_memory_allocator.Allocate("concat_v_" + std::to_string(i));
 
@@ -17,7 +18,7 @@ void Calculate(std::vector<Matrix *> keys, std::vector<Matrix *> values,
     gpu_sim.Copy(keys[0], concat_k, Position::kInGpuHbm);
     gpu_sim.Copy(values[0], concat_v, Position::kInGpuHbm);
 
-    // Concatenate remaining keys and values
+    // Concatenate remaining keys and values vertically (axis 0)
     for (size_t j = 1; j <= i; ++j) {
       Matrix* temp_k = matrix_memory_allocator.Allocate("temp_k_" + std::to_string(j));
       Matrix* temp_v = matrix_memory_allocator.Allocate("temp_v_" + std::to_string(j));
@@ -39,16 +40,18 @@ void Calculate(std::vector<Matrix *> keys, std::vector<Matrix *> values,
 
     // Step 3: Compute attention
     // Transpose K for matrix multiplication
+    // concat_k has shape [i+1, 512], after transpose it will be [512, i+1]
     Matrix* k_transpose = matrix_memory_allocator.Allocate("k_transpose_" + std::to_string(i));
     gpu_sim.Copy(concat_k, k_transpose, Position::kInSharedMemory);
     gpu_sim.Transpose(k_transpose, Position::kInSharedMemory);
 
     // Compute Q * K^T
+    // current_query: [i+1, 512] x k_transpose: [512, i+1] -> [i+1, i+1]
     Matrix* attention_scores = matrix_memory_allocator.Allocate("attention_scores_" + std::to_string(i));
     gpu_sim.MatMul(current_query, k_transpose, attention_scores);
 
     // Apply softmax row-wise
-    size_t rows = current_query->GetRowNum();
+    size_t rows = current_query->GetRowNum(); // i+1
 
     // Compute exp for all elements
     Matrix* exp_scores = matrix_memory_allocator.Allocate("exp_scores_" + std::to_string(i));
@@ -87,6 +90,7 @@ void Calculate(std::vector<Matrix *> keys, std::vector<Matrix *> values,
     }
 
     // Step 4: Multiply attention weights with V
+    // attention_weights: [i+1, i+1] x concat_v: [i+1, 512] -> [i+1, 512]
     Matrix* output = matrix_memory_allocator.Allocate("output_" + std::to_string(i));
     gpu_sim.MatMul(attention_weights, concat_v, output);
 
