@@ -38,7 +38,7 @@ void Calculate(std::vector<Matrix *> keys, std::vector<Matrix *> values,
     Matrix* exp_scores = matrix_memory_allocator.Allocate("exp_scores_" + std::to_string(i));
     gpu_sim.MatExp(scores, exp_scores);
 
-    // Normalize each row
+    // Normalize each row to get attention weights
     Matrix* attention_weights = matrix_memory_allocator.Allocate("attention_weights_" + std::to_string(i));
 
     for (size_t row = 0; row < rows; ++row) {
