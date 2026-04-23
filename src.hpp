@@ -49,7 +49,6 @@ void Calculate(std::vector<Matrix *> keys, std::vector<Matrix *> values,
 
     // Apply softmax row-wise
     size_t rows = current_query->GetRowNum();
-    size_t cols = concat_k->GetRowNum(); // This is the number of keys
 
     // Compute exp for all elements
     Matrix* exp_scores = matrix_memory_allocator.Allocate("exp_scores_" + std::to_string(i));
